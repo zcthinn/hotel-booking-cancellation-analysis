@@ -21,9 +21,9 @@ The analysis was performed using Excel-based statistical calculations and busine
 
 ![Statics Revenue Analysis](Excel_Statistic_1.png)
 
-### Cancellation Risks Points
+### Cancellation Risk Analysis
 
-![Cancellation Risks Points](Excel_Statistic_2 .png)
+![Cancellation Risks Analysis](Excel_Statistic_2 .png)
 
 ### Market Segments and Country Relationship
 
