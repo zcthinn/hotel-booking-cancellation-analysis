@@ -15,19 +15,19 @@ The analysis was performed using Excel-based statistical calculations and busine
 
 ### Executive Summary
 
-![Executive Summary](dashboard-preview.png)
+(dashboard-preview.png)
 
 ### Statics Revenue Analysis
 
-![Excel](Excel_Statistic_1.png)
+(Excel_Statistic_1.png)
 
 ### Cancellation Risk Point
 
-![Excel](Excel_Statistic_2.png)
+(Excel_Statistic_2.png)
 
 ### Market Segments and Country Relationship
 
-![Excel](Excel_Statistic_3.png)
+(Excel_Statistic_3.png)
 
 ---
 
