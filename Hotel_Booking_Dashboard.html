@@ -1,0 +1,1146 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Hotel Booking — Cancellation Risk & Business Impact</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=DM+Mono:wght@400;500&display=swap');
+
+/* ── BUSINESS PROFESSIONAL PALETTE ─────────────────────────────────────────
+   Primary:  Deep teal         #003D3D   (authority, trust)
+   Accent:   Teal accent       #008080   (brand highlight)
+   Surface:  Clean white      #FFFFFF
+   BG:       Cool slate grey  #F2F4F7
+   Border:   Steel grey       #D0D5E0
+   Risk:     Crimson          #C0392B   (critical alerts)
+   Warn:     Burnt amber      #D4770A   (moderate warning)
+   Safe:     Slate teal       #1A7A5E   (positive/safe)
+   Text:     Near-black       #111827
+   Muted:    Steel            #64748B
+────────────────────────────────────────────────────────────────────────── */
+:root {
+  --bg:        #F2F4F7;
+  --surface:   #FFFFFF;
+  --surface2:  #F8F9FC;
+  --border:    #D0D5E0;
+  --border2:   #E2E6EF;
+  --ink:       #111827;
+  --ink2:      #1E293B;
+  --muted:     #64748B;
+  --primary:   #003D3D;
+  --accent:    #008080;
+  --accent-lt: #E0F2F2;
+  --red:       #C0392B;
+  --red-lt:    #FDECEA;
+  --amber:     #D4770A;
+  --amber-lt:  #FEF3E2;
+  --green:     #1A7A5E;
+  --green-lt:  #E6F5F1;
+  --slate:     #475569;
+  /* risk gradient: safe → critical */
+  --c1: #1A7A5E; --c2: #D4770A; --c3: #C0622B;
+  --c4: #C0392B; --c5: #9B1C1C; --c6: #6B0F0F;
+}
+
+* { margin:0; padding:0; box-sizing:border-box; }
+body { background:var(--bg); color:var(--ink); font-family:'Inter',sans-serif; font-size:15px; line-height:1.65; }
+.page { max-width:1360px; margin:0 auto; }
+
+/* ── MASTHEAD ──────────────────────────────────────────────────────────── */
+.masthead {
+  background: linear-gradient(135deg, #003D3D 0%, #005959 100%);
+  color:#fff; padding:56px 64px 48px; position:relative; overflow:hidden;
+}
+.masthead::before {
+  content:''; position:absolute; top:0; right:0;
+  width:40%; height:100%;
+  background: linear-gradient(135deg, transparent 0%, rgba(0,128,128,0.15) 100%);
+  pointer-events:none;
+}
+.masthead::after {
+  content:''; position:absolute; bottom:0; left:0; right:0; height:3px;
+  background: linear-gradient(90deg, #008080 0%, #00B3B3 60%, #1A7A5E 100%);
+}
+.mast-eyebrow {
+  font-family:'DM Mono',monospace; font-size:10px; letter-spacing:0.22em;
+  text-transform:uppercase; color:#7FCFCF; margin-bottom:20px;
+  display:flex; align-items:center; gap:10px;
+}
+.mast-eyebrow::before { content:''; width:24px; height:1px; background:#7FCFCF; }
+.masthead h1 {
+  font-size:clamp(32px,5vw,60px); font-weight:700; line-height:1.08;
+  margin-bottom:18px; max-width:820px; letter-spacing:-0.02em;
+}
+.masthead h1 em { color:#7FCFCF; font-style:normal; }
+.mast-deck { font-size:15px; color:#94A3B8; max-width:620px; margin-bottom:40px; font-weight:300; }
+.mast-stats { display:flex; border:1px solid rgba(255,255,255,0.12); width:fit-content; }
+.mast-stat { padding:14px 28px; border-right:1px solid rgba(255,255,255,0.12); }
+.mast-stat:last-child { border-right:none; }
+.mast-stat dt { font-family:'DM Mono',monospace; font-size:9px; letter-spacing:0.18em; text-transform:uppercase; color:#64748B; margin-bottom:4px; }
+.mast-stat dd { font-family:'DM Mono',monospace; font-size:14px; color:#E2E8F0; }
+
+/* ── ALERT BANNER ──────────────────────────────────────────────────────── */
+.alert-banner {
+  background: #9B1C1C;
+  color:#fff; padding:14px 64px; display:flex; align-items:center; gap:20px;
+  font-size:13px; font-weight:500; border-bottom:2px solid #6B0F0F;
+}
+.alert-icon { width:26px; height:26px; background:rgba(255,255,255,0.18); border-radius:50%; display:flex; align-items:center; justify-content:center; font-size:13px; flex-shrink:0; }
+.alert-num { font-family:'DM Mono',monospace; font-size:17px; font-weight:600; margin-right:4px; }
+
+/* ── KPI STRIP ─────────────────────────────────────────────────────────── */
+.kpi-strip { display:grid; grid-template-columns:repeat(5,1fr); background:var(--surface); border-bottom:2px solid var(--border); box-shadow:0 1px 4px rgba(0,0,0,0.06); }
+.kpi { padding:26px 30px; border-right:1px solid var(--border); position:relative; transition:background .15s; }
+.kpi:hover { background:var(--surface2); }
+.kpi:last-child { border-right:none; }
+.kpi-label { font-size:10px; font-weight:600; letter-spacing:0.1em; text-transform:uppercase; color:var(--muted); margin-bottom:10px; }
+.kpi-value { font-size:32px; font-weight:700; line-height:1; margin-bottom:6px; letter-spacing:-0.02em; }
+.kpi-note { font-size:12px; color:var(--muted); }
+.kpi-r { color:var(--red); }
+.kpi-a { color:var(--amber); }
+.kpi-g { color:var(--green); }
+.kpi-n { color:var(--accent); }
+.kpi-rule { position:absolute; bottom:0; left:0; right:0; height:3px; }
+
+/* ── SECTION SHELL ─────────────────────────────────────────────────────── */
+.section { padding:48px 64px; border-bottom:1px solid var(--border); }
+.section-bg { background:var(--surface); }
+.section-head { display:flex; align-items:baseline; gap:14px; margin-bottom:32px; padding-bottom:14px; border-bottom:1px solid var(--border2); }
+.section-num { font-family:'DM Mono',monospace; font-size:10px; color:var(--muted); background:var(--surface2); border:1px solid var(--border); padding:2px 8px; border-radius:2px; }
+.section-title { font-size:22px; font-weight:700; color:var(--ink); letter-spacing:-0.01em; }
+.section-sub { font-size:13px; color:var(--muted); margin-left:auto; }
+.grid-2 { display:grid; grid-template-columns:1fr 1fr; gap:20px; }
+.card { background:var(--surface); border:1px solid var(--border); padding:26px; border-radius:2px; }
+.card-bg { background:var(--surface2); }
+.card-title { font-size:10px; font-weight:700; letter-spacing:0.1em; text-transform:uppercase; color:var(--muted); margin-bottom:20px; padding-bottom:12px; border-bottom:1px solid var(--border2); }
+canvas { width:100% !important; }
+
+/* ── HOTEL TOGGLE (MAIN FILTER) ────────────────────────────────────────── */
+.hotel-toggle-label { font-family:'DM Mono',monospace; font-size:10px; letter-spacing:0.14em; text-transform:uppercase; color:var(--muted); margin-bottom:10px; display:block; }
+.hotel-toggle { display:flex; border:1px solid var(--primary); width:fit-content; margin-bottom:22px; border-radius:2px; overflow:hidden; }
+.hotel-btn {
+  padding:12px 30px; font-size:13px; font-weight:700; letter-spacing:0.03em;
+  cursor:pointer; border:none; background:var(--surface); color:var(--primary);
+  font-family:'Inter',sans-serif; transition:background .15s,color .15s;
+  border-right:1px solid var(--primary); outline:none; display:flex; align-items:center; gap:8px;
+}
+.hotel-btn:last-child { border-right:none; }
+.hotel-btn:hover { background:var(--accent-lt); }
+.hotel-btn.hotel-active { background:var(--primary); color:#fff; }
+.hotel-btn .hb-dot { width:8px; height:8px; border-radius:50%; background:currentColor; opacity:0.55; }
+.hotel-btn.hotel-active .hb-dot { opacity:1; }
+
+/* ── DRIVER TABS ───────────────────────────────────────────────────────── */
+.driver-filter-label { font-family:'DM Mono',monospace; font-size:10px; letter-spacing:0.14em; text-transform:uppercase; color:var(--muted); margin-bottom:10px; display:block; }
+.driver-tabs { display:flex; border:1px solid var(--border); width:fit-content; flex-wrap:wrap; margin-bottom:24px; background:var(--surface); border-radius:2px; overflow:hidden; }
+.driver-tab {
+  padding:10px 20px; font-size:12px; font-weight:600; letter-spacing:0.03em;
+  cursor:pointer; border:none; background:transparent; color:var(--muted);
+  font-family:'Inter',sans-serif; transition:background .15s,color .15s;
+  border-right:1px solid var(--border); outline:none;
+}
+.driver-tab:last-child { border-right:none; }
+.driver-tab:hover { background:var(--accent-lt); color:var(--accent); }
+.driver-tab.tab-active-red   { background:var(--red);     color:#fff; }
+.driver-tab.tab-active-amber { background:var(--amber);   color:#fff; }
+.driver-tab.tab-active-navy  { background:var(--accent);  color:#fff; }
+.driver-tab.tab-active-green { background:var(--green);   color:#fff; }
+.driver-tab.tab-active-ink   { background:var(--primary); color:#fff; }
+
+/* ── DRIVER PANELS ─────────────────────────────────────────────────────── */
+.driver-panel { display:none; animation:fadeIn .2s ease; }
+.driver-panel.visible { display:block; }
+@keyframes fadeIn { from { opacity:0; transform:translateY(4px); } to { opacity:1; transform:translateY(0); } }
+
+/* ── DRIVER SUMMARY BAR ────────────────────────────────────────────────── */
+.dsb { display:grid; grid-template-columns:repeat(4,1fr); border:1px solid var(--border); background:var(--surface); margin-bottom:18px; border-radius:2px; overflow:hidden; }
+.dsb-cell { padding:18px 22px; border-right:1px solid var(--border); }
+.dsb-cell:last-child { border-right:none; }
+.dsb-label { font-size:10px; font-weight:600; letter-spacing:0.1em; text-transform:uppercase; color:var(--muted); margin-bottom:6px; }
+.dsb-val { font-size:24px; font-weight:700; line-height:1; letter-spacing:-0.01em; }
+.dsb-note { font-size:11px; color:var(--muted); margin-top:4px; }
+
+/* ── DRIVER INSIGHT ────────────────────────────────────────────────────── */
+.driver-insight {
+  background:var(--accent-lt); border-left:4px solid var(--accent);
+  padding:14px 20px; font-size:13px; color:var(--ink2); line-height:1.7; margin-bottom:20px;
+  border-radius:0 2px 2px 0;
+}
+.driver-insight strong { color:var(--ink); }
+
+/* ── RISK MATRIX ───────────────────────────────────────────────────────── */
+.risk-matrix { display:grid; grid-template-columns:repeat(6,1fr); border:1px solid var(--border); overflow:hidden; margin-bottom:20px; border-radius:2px; }
+.risk-cell { padding:22px 14px; border-right:1px solid var(--border); text-align:center; }
+.risk-cell:last-child { border-right:none; }
+.risk-window { font-family:'DM Mono',monospace; font-size:10px; color:var(--muted); margin-bottom:12px; }
+.risk-pct { font-size:34px; font-weight:700; line-height:1; margin-bottom:8px; letter-spacing:-0.02em; }
+.risk-badge { display:inline-block; font-size:9px; font-weight:700; letter-spacing:0.12em; text-transform:uppercase; padding:3px 8px; border-radius:2px; margin-bottom:10px; }
+.risk-track { height:3px; background:rgba(0,0,0,0.08); overflow:hidden; margin-top:10px; }
+.risk-fill { height:100%; transition:width 1.4s cubic-bezier(.4,0,.2,1); }
+
+/* Risk cell backgrounds — subtle tint */
+.rbg1{background:#EDF7F3}.rbg2{background:#FEF6E8}.rbg3{background:#FEF0E0}
+.rbg4{background:#FEE9E7}.rbg5{background:#F8E0DF}.rbg6{background:#F2D5D4}
+/* Risk pct colours */
+.rpc1{color:#1A7A5E}.rpc2{color:#D4770A}.rpc3{color:#C0622B}
+.rpc4{color:#C0392B}.rpc5{color:#9B1C1C}.rpc6{color:#6B0F0F}
+/* Risk badge colours */
+.rb1{background:#E6F5F1;color:#1A7A5E}.rb2{background:#FEF3E2;color:#D4770A}
+.rb3{background:#FEE8D6;color:#C0622B}.rb4{background:#FDECEA;color:#C0392B}
+.rb5{background:#F8DEDE;color:#9B1C1C}.rb6{background:#F0D0D0;color:#6B0F0F}
+/* Risk fill colours */
+.rf1{background:#1A7A5E}.rf2{background:#D4770A}.rf3{background:#C0622B}
+.rf4{background:#C0392B}.rf5{background:#9B1C1C}.rf6{background:#6B0F0F}
+
+/* ── IMPACT TABLE ──────────────────────────────────────────────────────── */
+.itbl { width:100%; border-collapse:collapse; }
+.itbl th { font-size:10px; font-weight:700; letter-spacing:0.1em; text-transform:uppercase; color:var(--muted); padding:10px 14px; text-align:left; background:var(--surface2); border-bottom:2px solid var(--border); }
+.itbl td { padding:12px 14px; font-size:13px; border-bottom:1px solid var(--border2); vertical-align:middle; }
+.itbl tr:last-child td { border-bottom:none; }
+.itbl td:not(:first-child) { font-family:'DM Mono',monospace; font-size:12px; }
+.itbl tr:hover td { background:var(--surface2); }
+.sev { display:inline-flex; align-items:center; font-size:10px; font-weight:700; letter-spacing:0.08em; text-transform:uppercase; padding:3px 9px; border-radius:2px; }
+.sev-low  { background:#E6F5F1; color:#1A7A5E; }
+.sev-med  { background:#FEF3E2; color:#D4770A; }
+.sev-high { background:#FDECEA; color:#C0392B; }
+.sev-crit { background:#F0D0D0; color:#6B0F0F; }
+
+/* ── HOTEL COMPARE ─────────────────────────────────────────────────────── */
+.compare-wrap { display:grid; grid-template-columns:1fr 1fr; border:1px solid var(--border); margin-bottom:20px; border-radius:2px; overflow:hidden; }
+.compare-panel { padding:28px 32px; border-right:1px solid var(--border); }
+.compare-panel:last-child { border-right:none; }
+.compare-name { font-size:18px; font-weight:700; margin-bottom:2px; }
+.compare-sub  { font-size:12px; color:var(--muted); margin-bottom:22px; }
+.stat-line { display:flex; justify-content:space-between; align-items:center; padding:10px 0; border-bottom:1px solid var(--border2); }
+.stat-line:last-child { border-bottom:none; }
+.stat-line dt { font-size:12px; color:var(--muted); }
+.stat-line dd { font-family:'DM Mono',monospace; font-size:13px; }
+
+/* ── CHANNEL BARS ──────────────────────────────────────────────────────── */
+.ch-item { margin-bottom:16px; }
+.ch-head { display:flex; justify-content:space-between; margin-bottom:6px; font-size:13px; }
+.ch-head span:first-child { font-weight:500; }
+.ch-head span:last-child  { font-family:'DM Mono',monospace; font-size:12px; color:var(--muted); }
+.ch-track { height:5px; background:var(--border2); overflow:hidden; border-radius:1px; }
+.ch-fill  { height:100%; transition:width 1.5s cubic-bezier(.4,0,.2,1); border-radius:1px; }
+
+/* ── RECOMMENDATIONS ───────────────────────────────────────────────────── */
+.rec-grid { display:grid; grid-template-columns:repeat(3,1fr); border:1px solid var(--border); border-radius:2px; overflow:hidden; }
+.rec-card { padding:24px 24px 24px 28px; border-right:1px solid var(--border); border-bottom:1px solid var(--border); position:relative; background:var(--surface); transition:background .15s; }
+.rec-card:hover { background:var(--surface2); }
+.rec-card:nth-child(3n) { border-right:none; }
+.rec-card:nth-child(n+4) { border-bottom:none; }
+.rec-card::before { content:''; position:absolute; top:0; left:0; width:4px; height:100%; }
+.rr::before{background:var(--red)}.ra::before{background:var(--amber)}.rg::before{background:var(--green)}.rn::before{background:var(--accent)}
+.rec-tag { font-size:9px; font-weight:700; letter-spacing:0.14em; text-transform:uppercase; margin-bottom:10px; }
+.tr{color:var(--red)}.ta{color:var(--amber)}.tg{color:var(--green)}.tn{color:var(--accent)}
+.rec-num { font-size:32px; font-weight:700; line-height:1; margin-bottom:8px; letter-spacing:-0.02em; }
+.rec-heading { font-size:13px; font-weight:600; margin-bottom:8px; color:var(--ink); }
+.rec-body { font-size:12px; color:var(--muted); line-height:1.6; }
+
+/* ── FOOTER ────────────────────────────────────────────────────────────── */
+.footer {
+  background: linear-gradient(135deg, #003D3D 0%, #005959 100%);
+  color:#fff; padding:32px 64px; display:flex; justify-content:space-between; align-items:center;
+  border-top:3px solid #008080;
+}
+.footer-name { font-size:16px; font-weight:700; color:#E2E8F0; }
+.footer-role { font-size:12px; color:#64748B; margin-top:3px; }
+
+@media(max-width:960px){
+  .masthead,.section,.alert-banner,.footer{padding-left:24px;padding-right:24px}
+  .kpi-strip{grid-template-columns:1fr 1fr}
+  .risk-matrix{grid-template-columns:repeat(3,1fr)}
+  .grid-2,.compare-wrap,.rec-grid{grid-template-columns:1fr}
+  .compare-panel{border-right:none;border-bottom:1px solid var(--border)}
+  .dsb{grid-template-columns:1fr 1fr}
+  .driver-tabs{width:100%}
+  .driver-tab{flex:1;text-align:center}
+}
+</style>
+</head>
+<body>
+<div class="page">
+
+<!-- MASTHEAD -->
+<header class="masthead">
+  <div class="mast-eyebrow">Data Analytics · Hospitality Sector</div>
+  <h1>Cancellation Risk &amp;<br><em>Business Impact Analysis</em></h1>
+  <p class="mast-deck">A quantitative assessment of booking cancellation patterns across City and Resort Hotel operations — identifying financial exposure, risk segments, and recovery strategies for management decision-making.</p>
+  <div class="mast-stats">
+    <div class="mast-stat"><dt>Period</dt><dd>Jul 2015 – Aug 2017</dd></div>
+    <div class="mast-stat"><dt>Bookings Analysed</dt><dd>115,596</dd></div>
+    <div class="mast-stat"><dt>Hotel Properties</dt><dd>2 (City &amp; Resort)</dd></div>
+  </div>
+</header>
+
+<!-- ALERT BANNER -->
+<div class="alert-banner">
+  <div class="alert-icon">⚠</div>
+  <span><span class="alert-num">37.0%</span> overall cancellation rate — <strong>42,755 bookings cancelled</strong>, representing an estimated <strong>€15.1M in at-risk revenue</strong> requiring immediate policy intervention.</span>
+</div>
+
+<!-- KPI STRIP -->
+<div class="kpi-strip">
+  <div class="kpi">
+    <div class="kpi-label">Total Cancellations</div>
+    <div class="kpi-value kpi-r">42,755</div>
+    <div class="kpi-note">Out of 115,596 bookings</div>
+    <div class="kpi-rule" style="background:var(--red)"></div>
+  </div>
+  <div class="kpi">
+    <div class="kpi-label">Revenue at Risk</div>
+    <div class="kpi-value kpi-r">€15.1M</div>
+    <div class="kpi-note">Cancelled booking value</div>
+    <div class="kpi-rule" style="background:var(--c5)"></div>
+  </div>
+  <div class="kpi">
+    <div class="kpi-label">City Hotel Cancel Rate</div>
+    <div class="kpi-value kpi-a">41.8%</div>
+    <div class="kpi-note">32,610 of 78,040 bookings</div>
+    <div class="kpi-rule" style="background:var(--amber)"></div>
+  </div>
+  <div class="kpi">
+    <div class="kpi-label">Resort Hotel Cancel Rate</div>
+    <div class="kpi-value kpi-g">27.0%</div>
+    <div class="kpi-note">10,145 of 37,556 bookings</div>
+    <div class="kpi-rule" style="background:var(--green)"></div>
+  </div>
+  <div class="kpi">
+    <div class="kpi-label">Confirmed Revenue</div>
+    <div class="kpi-value kpi-n">€38.8M</div>
+    <div class="kpi-note">Jul 2015 – Aug 2017</div>
+    <div class="kpi-rule" style="background:var(--navy)"></div>
+  </div>
+</div>
+
+<!-- ══ SECTION 01: DRIVER EXPLORER ══ -->
+<section class="section section-bg">
+  <div class="section-head">
+    <h2 class="section-title">Cancellation Driver Analysis</h2>
+    <span class="section-sub">Choose a driver category below to explore its risk profile and financial impact</span>
+  </div>
+
+  <span class="hotel-toggle-label">Select Property</span>
+  <div class="hotel-toggle" role="tablist">
+    <button class="hotel-btn hotel-active" data-hotel="all">🏢&nbsp; All Properties</button>
+    <button class="hotel-btn" data-hotel="city">🏙️&nbsp; City Hotel</button>
+    <button class="hotel-btn" data-hotel="resort">🏖️&nbsp; Resort Hotel</button>
+  </div>
+
+  <span class="driver-filter-label">Select Cancellation Driver (Sub-Option)</span>
+  <div class="driver-tabs" role="tablist">
+    <button class="driver-tab tab-active-red" data-panel="lead"    data-color="red"   role="tab">⏱&nbsp; Lead Time</button>
+    <button class="driver-tab"                data-panel="market"  data-color="amber" role="tab">📊&nbsp; Market Segment</button>
+    <button class="driver-tab"                data-panel="custtype" data-color="navy" role="tab">👥&nbsp; Customer Type</button>
+    <button class="driver-tab"                data-panel="deposit" data-color="green" role="tab">💳&nbsp; Booking Type</button>
+    <button class="driver-tab"                data-panel="geo"     data-color="ink"   role="tab">🌍&nbsp; Customer Geographic</button>
+  </div>
+
+  <div id="hotelContextNote" style="display:none; margin-bottom:20px; font-size:12px; color:var(--accent); background:var(--accent-lt); border-left:4px solid var(--accent); padding:10px 16px; border-radius:0 2px 2px 0; font-weight:600;"></div>
+
+  <!-- ─ PANEL A: LEAD TIME ─ -->
+  <div class="driver-panel visible" id="panel-lead">
+    <div class="dsb">
+      <div class="dsb-cell"><div class="dsb-label">Driver Weight</div><div class="dsb-val" id="lead-weight" style="color:var(--red)">Primary</div><div class="dsb-note">Strongest single predictor</div></div>
+      <div class="dsb-cell"><div class="dsb-label">Max Cancel Rate</div><div class="dsb-val" id="lead-max" style="color:var(--c6)">67.7%</div><div class="dsb-note">Bookings 365+ days out</div></div>
+      <div class="dsb-cell"><div class="dsb-label">Min Cancel Rate</div><div class="dsb-val" id="lead-min" style="color:var(--green)">11.0%</div><div class="dsb-note">Bookings within 7 days</div></div>
+      <div class="dsb-cell"><div class="dsb-label">Revenue at Risk</div><div class="dsb-val" id="lead-risk-rev" style="color:var(--red)">€5.7M</div><div class="dsb-note">High-risk windows (91d+)</div></div>
+    </div>
+    <div class="driver-insight" id="lead-insight"><strong>Key finding:</strong> Cancellation probability scales almost linearly with booking lead time — a booking made 365+ days ahead is <strong>6.2× more likely to cancel</strong> than a last-minute booking. This pattern is consistent across both hotel types and all market segments, making lead time the single most actionable variable for deposit and cancellation policy targeting.</div>
+    <div class="risk-matrix" id="lead-matrix">
+      <div class="risk-cell rbg1"><div class="risk-window">0 – 7 days</div><div class="risk-pct rpc1" id="lead-pct-0">11.0%</div><div class="risk-badge rb1">Safe Zone</div><div class="risk-track"><div class="risk-fill rf1" id="lead-fill-0" style="width:0%" data-target="16.3"></div></div></div>
+      <div class="risk-cell rbg2"><div class="risk-window">8 – 30 days</div><div class="risk-pct rpc2" id="lead-pct-1">27.5%</div><div class="risk-badge rb2">Moderate</div><div class="risk-track"><div class="risk-fill rf2" id="lead-fill-1" style="width:0%" data-target="40.6"></div></div></div>
+      <div class="risk-cell rbg3"><div class="risk-window">31 – 90 days</div><div class="risk-pct rpc3" id="lead-pct-2">37.6%</div><div class="risk-badge rb3">Elevated</div><div class="risk-track"><div class="risk-fill rf3" id="lead-fill-2" style="width:0%" data-target="55.6"></div></div></div>
+      <div class="risk-cell rbg4"><div class="risk-window">91 – 180 days</div><div class="risk-pct rpc4" id="lead-pct-3">44.5%</div><div class="risk-badge rb4">High Risk</div><div class="risk-track"><div class="risk-fill rf4" id="lead-fill-3" style="width:0%" data-target="65.7"></div></div></div>
+      <div class="risk-cell rbg5"><div class="risk-window">181 – 365 days</div><div class="risk-pct rpc5" id="lead-pct-4">55.5%</div><div class="risk-badge rb5">Critical</div><div class="risk-track"><div class="risk-fill rf5" id="lead-fill-4" style="width:0%" data-target="82.0"></div></div></div>
+      <div class="risk-cell rbg6"><div class="risk-window">365 + days</div><div class="risk-pct rpc6" id="lead-pct-5">67.7%</div><div class="risk-badge rb6">Extreme</div><div class="risk-track"><div class="risk-fill rf6" id="lead-fill-5" style="width:0%" data-target="100"></div></div></div>
+    </div>
+    <div class="grid-2">
+      <div class="card card-bg">
+        <div class="card-title">Cancellation Rate by Booking Window</div>
+        <canvas id="leadChart" height="140"></canvas>
+      </div>
+      <div class="card card-bg">
+        <div class="card-title">Financial Exposure by Booking Window</div>
+        <table class="itbl">
+          <thead><tr><th>Booking Window</th><th>Cancel Rate</th><th>Est. Revenue Lost</th><th>Severity</th></tr></thead>
+          <tbody id="lead-table-body">
+            <tr><td>0 – 7 days</td><td>11.0%</td><td>~€0.9M</td><td><span class="sev sev-low">Low</span></td></tr>
+            <tr><td>8 – 30 days</td><td>27.5%</td><td>~€2.1M</td><td><span class="sev sev-med">Moderate</span></td></tr>
+            <tr><td>31 – 90 days</td><td>37.6%</td><td>~€3.4M</td><td><span class="sev sev-med">Elevated</span></td></tr>
+            <tr><td>91 – 180 days</td><td>44.5%</td><td>~€3.8M</td><td><span class="sev sev-high">High</span></td></tr>
+            <tr><td>181 – 365 days</td><td>55.5%</td><td>~€2.9M</td><td><span class="sev sev-crit">Critical</span></td></tr>
+            <tr><td>365+ days</td><td>67.7%</td><td>~€2.0M</td><td><span class="sev sev-crit">Extreme</span></td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <!-- ─ PANEL B: MARKET SEGMENT ─ -->
+  <div class="driver-panel" id="panel-market">
+    <div class="dsb">
+      <div class="dsb-cell"><div class="dsb-label">Driver Weight</div><div class="dsb-val" id="mkt-weight" style="color:var(--amber)">High</div><div class="dsb-note">OTA segment drives majority of revenue</div></div>
+      <div class="dsb-cell"><div class="dsb-label">Highest Cancel Segment</div><div class="dsb-val" id="mkt-high-seg" style="color:var(--red)">Online TA</div><div class="dsb-note" id="mkt-high-rate">~47% cancellation rate</div></div>
+      <div class="dsb-cell"><div class="dsb-label">Lowest Cancel Segment</div><div class="dsb-val" id="mkt-low-seg" style="color:var(--green)">Aviation</div><div class="dsb-note" id="mkt-low-rate">~8% cancellation rate</div></div>
+      <div class="dsb-cell"><div class="dsb-label">Direct Booking Rate</div><div class="dsb-val" id="mkt-direct-rate" style="color:var(--navy)">~22%</div><div class="dsb-note">Lowest risk of main segments</div></div>
+    </div>
+    <div class="driver-insight" id="mkt-insight"><strong>Key finding:</strong> The Online Travel Agency segment generates 54.6% of total revenue yet carries the highest cancellation rate (~47%), driven by platform-enforced free cancellation policies. In contrast, Direct bookings cancel at only ~22% — demonstrating that shifting channel mix is the single highest-leverage commercial action available. Corporate and Aviation segments are near-negligible in volume but show the healthiest cancellation profiles.</div>
+    <div class="grid-2">
+      <div class="card card-bg">
+        <div class="card-title">Cancellation Rate by Market Segment</div>
+        <canvas id="mktCancelChart" height="180"></canvas>
+      </div>
+      <div class="card card-bg">
+        <div class="card-title">Market Segment — Revenue &amp; Risk Profile</div>
+        <table class="itbl">
+          <thead><tr><th>Segment</th><th>Revenue Share</th><th>Cancel Rate</th><th>Risk</th></tr></thead>
+          <tbody id="mkt-table-body">
+            <tr><td>Online Travel Agency</td><td>54.6%</td><td>~47%</td><td><span class="sev sev-crit">Critical</span></td></tr>
+            <tr><td>Offline TA / Tour Ops</td><td>20.7%</td><td>~32%</td><td><span class="sev sev-high">High</span></td></tr>
+            <tr><td>Groups</td><td>11.9%</td><td>~28%</td><td><span class="sev sev-med">Moderate</span></td></tr>
+            <tr><td>Direct</td><td>10.5%</td><td>~22%</td><td><span class="sev sev-med">Moderate</span></td></tr>
+            <tr><td>Corporate</td><td>2.0%</td><td>~14%</td><td><span class="sev sev-low">Low</span></td></tr>
+            <tr><td>Aviation</td><td>0.2%</td><td>~8%</td><td><span class="sev sev-low">Low</span></td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <!-- ─ PANEL C: CUSTOMER TYPE ─ -->
+  <div class="driver-panel" id="panel-custtype">
+    <div class="dsb">
+      <div class="dsb-cell"><div class="dsb-label">Driver Weight</div><div class="dsb-val" style="color:var(--navy)">Moderate</div><div class="dsb-note">Guest commitment varies by type</div></div>
+      <div class="dsb-cell"><div class="dsb-label">Highest Cancel Type</div><div class="dsb-val" id="cust-high-rate" style="color:var(--red)">~41% cancellation rate</div><div class="dsb-note">Transient</div></div>
+      <div class="dsb-cell"><div class="dsb-label">Lowest Cancel Type</div><div class="dsb-val" id="cust-low-rate" style="color:var(--green)">~6% cancellation rate</div><div class="dsb-note">Group</div></div>
+      <div class="dsb-cell"><div class="dsb-label">Transient Share</div><div class="dsb-val" id="cust-transient-share" style="color:var(--amber)">75.1%</div><div class="dsb-note">Dominant booking type</div></div>
+    </div>
+    <div class="driver-insight" id="cust-insight"><strong>Key finding:</strong> Transient guests (individual travellers) represent 75.1% of all bookings and cancel at ~41% — they are the primary revenue risk vector. Transient-Party guests (small groups travelling together) cancel at ~28%. Contract guests cancel at ~11% reflecting pre-committed terms. Group bookings carry the lowest cancellation risk (~6%) due to contractual deposits and group leader accountability. Strategies targeting transient OTA guests yield the greatest return.</div>
+    <div class="grid-2">
+      <div class="card card-bg">
+        <div class="card-title">Cancellation Rate by Customer Type</div>
+        <canvas id="custTypeChart" height="180"></canvas>
+      </div>
+      <div class="card card-bg">
+        <div class="card-title">Customer Type — Booking Volume &amp; Cancel Profile</div>
+        <table class="itbl">
+          <thead><tr><th>Customer Type</th><th>Booking Share</th><th>Cancel Rate</th><th>Risk Level</th></tr></thead>
+          <tbody id="cust-table-body">
+            <tr><td>Transient</td><td>75.1%</td><td>~41%</td><td><span class="sev sev-crit">Critical</span></td></tr>
+            <tr><td>Transient-Party</td><td>21.1%</td><td>~28%</td><td><span class="sev sev-high">High</span></td></tr>
+            <tr><td>Contract</td><td>2.8%</td><td>~11%</td><td><span class="sev sev-low">Low</span></td></tr>
+            <tr><td>Group</td><td>1.0%</td><td>~6%</td><td><span class="sev sev-low">Low</span></td></tr>
+          </tbody>
+        </table>
+        <p style="font-size:12px;color:var(--muted);margin-top:16px;line-height:1.6;padding-top:12px;border-top:1px solid var(--border2)"><strong style="color:var(--red)">Action:</strong> Targeted retention campaigns for Transient guests at the 30–90 day pre-arrival window — where cancellation risk peaks — can significantly reduce last-minute revenue gaps.</p>
+      </div>
+    </div>
+  </div>
+
+  <!-- ─ PANEL D: BOOKING TYPE (DEPOSIT) ─ -->
+  <div class="driver-panel" id="panel-deposit">
+    <div class="dsb">
+      <div class="dsb-cell"><div class="dsb-label">Driver Weight</div><div class="dsb-val" style="color:var(--green)">Very High</div><div class="dsb-note">Strongest policy lever</div></div>
+      <div class="dsb-cell"><div class="dsb-label">No Deposit Cancel Rate</div><div class="dsb-val" id="dep-nodep-rate" style="color:var(--red)">40.8%</div><div class="dsb-note">87.9% of all bookings</div></div>
+      <div class="dsb-cell"><div class="dsb-label">Non-Refundable Rate</div><div class="dsb-val" id="dep-nonref-rate" style="color:var(--green)">22.0%</div><div class="dsb-note">~2× safer than no deposit</div></div>
+      <div class="dsb-cell"><div class="dsb-label">Refundable Cancel Rate</div><div class="dsb-val" id="dep-ref-rate" style="color:var(--c6)">99.4%</div><div class="dsb-note">Near-certain cancellation</div></div>
+    </div>
+    <div class="driver-insight" id="dep-insight"><strong>Key finding:</strong> Deposit policy is the most powerful single lever for reducing cancellations. Bookings with a <strong>refundable deposit cancel at 99.4%</strong> — essentially a placeholder with no commitment. No-deposit bookings (87.9% of volume) cancel at 40.8%. Non-refundable bookings, while only 11.5% of volume, cancel at just 22% — confirming that financial commitment dramatically increases guest follow-through. Expanding non-refundable rates, especially for high-risk lead-time segments, is the highest-ROI policy change available.</div>
+    <div class="grid-2">
+      <div class="card card-bg">
+        <div class="card-title">Cancellation Rate by Deposit / Booking Type</div>
+        <canvas id="depositChart" height="180"></canvas>
+      </div>
+      <div class="card card-bg">
+        <div class="card-title">Booking Type — Volume, Cancel Rate &amp; Revenue Impact</div>
+        <table class="itbl">
+          <thead><tr><th>Deposit Type</th><th>Booking Share</th><th>Cancel Rate</th><th>Risk</th></tr></thead>
+          <tbody id="dep-table-body">
+            <tr><td>No Deposit</td><td>87.9%</td><td>40.8%</td><td><span class="sev sev-high">High</span></td></tr>
+            <tr><td>Non-Refundable</td><td>11.5%</td><td>22.0%</td><td><span class="sev sev-med">Moderate</span></td></tr>
+            <tr><td>Refundable</td><td>0.6%</td><td>99.4%</td><td><span class="sev sev-crit">Extreme</span></td></tr>
+          </tbody>
+        </table>
+        <p style="font-size:12px;color:var(--muted);margin-top:16px;line-height:1.6;padding-top:12px;border-top:1px solid var(--border2)"><strong style="color:var(--red)">Policy recommendation:</strong> Eliminating refundable deposit offerings and converting 20% of no-deposit bookings &gt;90 days out to non-refundable could recover an estimated <strong style="color:var(--ink)">€2.4–€3.1M annually</strong>.</p>
+      </div>
+    </div>
+  </div>
+
+  <!-- ─ PANEL E: CUSTOMER GEOGRAPHIC ─ -->
+  <div class="driver-panel" id="panel-geo">
+    <div class="dsb">
+      <div class="dsb-cell"><div class="dsb-label">Driver Weight</div><div class="dsb-val" style="color:var(--ink)">Moderate</div><div class="dsb-note">Market-specific patterns</div></div>
+      <div class="dsb-cell"><div class="dsb-label">Top Revenue Market</div><div class="dsb-val" id="geo-top-market" style="color:var(--navy)">Portugal</div><div class="dsb-note" id="geo-top-detail">€12.7M · 32.7% of total</div></div>
+      <div class="dsb-cell"><div class="dsb-label">Top 2 Markets Share</div><div class="dsb-val" id="geo-top2-share" style="color:var(--navy)">45.8%</div><div class="dsb-note">Portugal + UK combined</div></div>
+      <div class="dsb-cell"><div class="dsb-label">International Exposure</div><div class="dsb-val" style="color:var(--amber)">High</div><div class="dsb-note">Long-haul = longer lead times</div></div>
+    </div>
+    <div class="driver-insight" id="geo-insight"><strong>Key finding:</strong> Portugal (domestic) accounts for €12.7M (32.7%) of revenue with generally lower cancellation risk due to shorter booking windows. International markets — particularly UK, France, and Germany — carry higher cancellation exposure because of longer planning horizons and greater reliance on OTA platforms with flexible cancellation policies. Geographic segmentation should inform differentiated deposit policies by origin market.</div>
+    <div class="grid-2">
+      <div class="card card-bg">
+        <div class="card-title">Top 8 Source Markets by Revenue</div>
+        <canvas id="countryChart" height="250"></canvas>
+      </div>
+      <div class="card card-bg">
+        <div class="card-title">Market Risk Profile</div>
+        <table class="itbl">
+          <thead><tr><th>Market</th><th>Revenue</th><th>Lead Time Risk</th><th>OTA Reliance</th></tr></thead>
+          <tbody id="geo-table-body">
+            <tr><td>Portugal</td><td>€12.7M</td><td><span class="sev sev-low">Lower</span></td><td>Medium</td></tr>
+            <tr><td>United Kingdom</td><td>€5.0M</td><td><span class="sev sev-high">Higher</span></td><td>High</td></tr>
+            <tr><td>France</td><td>€3.7M</td><td><span class="sev sev-med">Moderate</span></td><td>High</td></tr>
+            <tr><td>Spain</td><td>€2.6M</td><td><span class="sev sev-low">Lower</span></td><td>Medium</td></tr>
+            <tr><td>Germany</td><td>€2.6M</td><td><span class="sev sev-high">Higher</span></td><td>High</td></tr>
+            <tr><td>Ireland</td><td>€1.6M</td><td><span class="sev sev-med">Moderate</span></td><td>High</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ══ QUARTERLY TREND ══ -->
+<section class="section section-bg">
+  <div class="section-head">
+    <h2 class="section-title">Quarterly Cancellation Volume vs Revenue Impact</h2>
+    <span class="section-sub">9-quarter operational view — 2015 to 2017</span>
+  </div>
+  <div class="card card-bg" style="padding:32px;">
+    <div class="card-title">Quarterly Cancellations (bars) vs Total Revenue (line) · Q3 2015 – Q3 2017</div>
+    <div style="position:relative; height:420px; width:100%;">
+      <canvas id="trendChart"></canvas>
+    </div>
+  </div>
+</section>
+
+<!-- ══ SECTION 03: RECOMMENDATIONS ══ -->
+<section class="section section-bg">
+  <div class="section-head">
+    <h2 class="section-title">Management Recommendations</h2>
+    <span class="section-sub">Data-backed actions to reduce cancellation rate and protect revenue</span>
+  </div>
+  <div class="rec-grid">
+    <div class="rec-card rr">
+      <div class="rec-tag tr">Immediate · Deposit Policy</div>
+      <div class="rec-num" style="color:var(--red)">−18%</div>
+      <div class="rec-heading">Tiered Non-Refundable Deposit by Lead Time</div>
+      <div class="rec-body">Mandate 20–40% non-refundable deposit for bookings &gt;90 days out, scaling to 50% for &gt;365 days. Modelled to reduce cancellation rate by ~18% in high-risk segments and recover €2.0–€2.8M annually.</div>
+    </div>
+    <div class="rec-card ra">
+      <div class="rec-tag ta">Short-term · Channel Mix</div>
+      <div class="rec-num" style="color:var(--amber)">+€1.5M</div>
+      <div class="rec-heading">Incentivise Direct Bookings Over OTA</div>
+      <div class="rec-body">OTA-sourced bookings carry 15–20% higher cancellation rates than direct. Loyalty discounts, exclusive room tiers, and upgrade offers for direct bookers could shift ~10% of OTA volume, recovering an estimated €1.5M.</div>
+    </div>
+    <div class="rec-card rn">
+      <div class="rec-tag tn">Operational · City Hotel</div>
+      <div class="rec-num" style="color:var(--navy)">41.8%</div>
+      <div class="rec-heading">City Hotel Requires Dedicated Intervention</div>
+      <div class="rec-body">At 41.8% vs Resort's 27.0%, City Hotel accounts for 76% of all cancellations. A targeted overbooking buffer of 8–12% during Q2–Q3, combined with waitlist management, would minimise revenue gaps on high-demand nights.</div>
+    </div>
+    <div class="rec-card rr">
+      <div class="rec-tag tr">Strategic · Pricing</div>
+      <div class="rec-num" style="color:var(--red)">Jul–Aug</div>
+      <div class="rec-heading">Dynamic Pricing Calibrated to Cancel Risk</div>
+      <div class="rec-body">July–August show highest ADR (€126–€140) alongside elevated cancellation volumes. Implement dynamic rates that price in cancellation probability — raising base rates for flexible bookings and discounting locked-in non-refundable rates.</div>
+    </div>
+    <div class="rec-card rg">
+      <div class="rec-tag tg">Revenue Recovery · Upsell</div>
+      <div class="rec-num" style="color:var(--green)">+€0.9M</div>
+      <div class="rec-heading">Cancellation-to-Waitlist Conversion Programme</div>
+      <div class="rec-body">Automate same-day cancellation alerts to a pre-qualified waitlist. Historical data shows 2,400+ same-day cancellations annually — converting 30–35% to same-night bookings at peak-season ADR yields ~€0.9M incremental revenue.</div>
+    </div>
+    <div class="rec-card rn">
+      <div class="rec-tag tn">Long-term · Forecasting</div>
+      <div class="rec-num" style="color:var(--navy)">+169%</div>
+      <div class="rec-heading">Build Cancellation Prediction Model</div>
+      <div class="rec-body">Revenue grew 169% from 2015 to 2016, with continued ADR growth into 2017. A predictive ML model using lead time, channel, country, meal type, and season could flag bookings with &gt;60% cancel probability at intake for proactive intervention.</div>
+    </div>
+  </div>
+</section>
+
+<!-- FOOTER -->
+<footer class="footer">
+  <div>
+    <div class="footer-name">Hotel Booking — Cancellation &amp; Business Impact Analysis</div>
+    <div class="footer-role">Data Analytics Engineering Portfolio · Zar Chi Thinn</div>
+  </div>
+</footer>
+
+</div>
+<script>
+// ── DATA ─────────────────────────────────────────────────────────────────
+
+// Current active hotel filter: 'all' | 'city' | 'resort'
+var currentHotel = 'all';
+
+// Severity bucket helper
+function sevClass(rate) {
+  if (rate >= 60) return 'sev-crit';
+  if (rate >= 40) return 'sev-high';
+  if (rate >= 20) return 'sev-med';
+  return 'sev-low';
+}
+function sevLabel(rate) {
+  if (rate >= 60) return 'Extreme';
+  if (rate >= 40) return 'High';
+  if (rate >= 20) return 'Moderate';
+  return 'Low';
+}
+
+// Complete per-hotel dataset — drives charts AND all static text/tables
+var hotelData = {
+
+  all: {
+    label: 'All Properties', baseline: '37.0%',
+
+    lead: {
+      vals: [11, 27.5, 37.6, 44.5, 55.5, 67.7],
+      windows: ['0 – 7 days','8 – 30 days','31 – 90 days','91 – 180 days','181 – 365 days','365 + days'],
+      revLost: ['~€0.9M','~€2.1M','~€3.4M','~€3.8M','~€2.9M','~€2.0M'],
+      max: '67.7%', min: '11.0%', riskRev: '€5.7M',
+      insight: 'Cancellation probability scales almost linearly with booking lead time across the full portfolio — a booking made 365+ days ahead is <strong>6.2× more likely to cancel</strong> than a last-minute booking. This pattern is consistent across both hotel types and all market segments, making lead time the single most actionable variable for deposit and cancellation policy targeting.'
+    },
+    market: {
+      vals: [47, 32, 28, 22, 14, 8],
+      segs: ['Online Travel Agency','Offline TA / Tour Ops','Groups','Direct','Corporate','Aviation'],
+      shares: ['54.6%','20.7%','11.9%','10.5%','2.0%','0.2%'],
+      highSeg: 'Online TA', highRate: '~47% cancellation rate', lowSeg: 'Aviation', lowRate: '~8% cancellation rate', directRate: '~22%',
+      insight: 'The Online Travel Agency segment generates 54.6% of total revenue across the portfolio yet carries the highest cancellation rate (~47%), driven by platform-enforced free cancellation policies. In contrast, Direct bookings cancel at only ~22% — demonstrating that shifting channel mix is the single highest-leverage commercial action available. Corporate and Aviation segments are near-negligible in volume but show the healthiest cancellation profiles.'
+    },
+    cust: {
+      vals: [41, 28, 11, 6],
+      types: ['Transient','Transient-Party','Contract','Group'],
+      shares: ['75.1%','21.1%','2.8%','1.0%'],
+      highRate: '~41% cancellation rate', lowRate: '~6% cancellation rate', transientShare: '75.1%',
+      insight: 'Across the portfolio, Transient guests (individual travellers) represent 75.1% of all bookings and cancel at ~41% — they are the primary revenue risk vector. Transient-Party guests (small groups travelling together) cancel at ~28%. Contract guests cancel at ~11% reflecting pre-committed terms. Group bookings carry the lowest cancellation risk (~6%) due to contractual deposits and group leader accountability.'
+    },
+    deposit: {
+      vals: [40.8, 22.0, 99.4],
+      shares: ['87.9%','11.5%','0.6%'],
+      noDep: '40.8%', nonRef: '22.0%', ref: '99.4%',
+      insight: 'Deposit policy is the most powerful single lever for reducing cancellations portfolio-wide. Bookings with a <strong>refundable deposit cancel at 99.4%</strong> — essentially a placeholder with no commitment. No-deposit bookings (87.9% of volume) cancel at 40.8%. Non-refundable bookings, while only 11.5% of volume, cancel at just 22% — confirming that financial commitment dramatically increases guest follow-through.'
+    },
+    geo: {
+      countries: ['Portugal','United Kingdom','France','Spain','Germany','Ireland','Italy','Belgium'],
+      rev: [12.68,4.97,3.75,2.57,2.55,1.57,1.32,0.92],
+      topMarket: 'Portugal', topDetail: '€12.7M · 32.7% of total', top2Share: '45.8%',
+      table: [
+        ['Portugal','€12.7M','sev-low','Lower','Medium'],
+        ['United Kingdom','€5.0M','sev-high','Higher','High'],
+        ['France','€3.7M','sev-med','Moderate','High'],
+        ['Spain','€2.6M','sev-low','Lower','Medium'],
+        ['Germany','€2.6M','sev-high','Higher','High'],
+        ['Ireland','€1.6M','sev-med','Moderate','High']
+      ],
+      insight: 'Portugal (domestic) accounts for €12.7M (32.7%) of portfolio revenue with generally lower cancellation risk due to shorter booking windows. International markets — particularly UK, France, and Germany — carry higher cancellation exposure because of longer planning horizons and greater reliance on OTA platforms with flexible cancellation policies.'
+    }
+  },
+
+  city: {
+    label: 'City Hotel', baseline: '41.8%',
+
+    lead: {
+      vals: [14, 32.4, 43.8, 51.2, 61.0, 72.5],
+      windows: ['0 – 7 days','8 – 30 days','31 – 90 days','91 – 180 days','181 – 365 days','365 + days'],
+      revLost: ['~€0.7M','~€1.6M','~€2.5M','~€2.7M','~€2.0M','~€1.4M'],
+      max: '72.5%', min: '14.0%', riskRev: '€4.1M',
+      insight: 'City Hotel cancellation risk scales sharply with lead time — a booking made 365+ days ahead is <strong>5.2× more likely to cancel</strong> than a last-minute booking. City Hotel runs consistently 3–5 percentage points hotter than the portfolio average at every window, reflecting its transient, OTA-heavy urban guest base with lower trip commitment.'
+    },
+    market: {
+      vals: [52, 37, 31, 25, 16, 9],
+      segs: ['Online Travel Agency','Offline TA / Tour Ops','Groups','Direct','Corporate','Aviation'],
+      shares: ['58.2%','18.4%','9.6%','11.2%','2.3%','0.3%'],
+      highSeg: 'Online TA', highRate: '~52% cancellation rate', lowSeg: 'Aviation', lowRate: '~9% cancellation rate', directRate: '~25%',
+      insight: 'At City Hotel, the Online Travel Agency channel drives 58.2% of revenue and cancels at ~52% — the highest of any segment in the portfolio. Urban guests booking through OTAs show low trip commitment and high price-comparison behaviour, making this property the priority target for channel-mix rebalancing.'
+    },
+    cust: {
+      vals: [46, 33, 13, 8],
+      types: ['Transient','Transient-Party','Contract','Group'],
+      shares: ['78.6%','18.9%','1.8%','0.7%'],
+      highRate: '~46% cancellation rate', lowRate: '~8% cancellation rate', transientShare: '78.6%',
+      insight: 'At City Hotel, Transient guests make up 78.6% of bookings and cancel at ~46% — well above the portfolio average. The urban business/leisure mix skews heavily individual rather than group, concentrating cancellation risk in this single, dominant customer type.'
+    },
+    deposit: {
+      vals: [45.6, 26.1, 99.6],
+      shares: ['89.4%','9.8%','0.8%'],
+      noDep: '45.6%', nonRef: '26.1%', ref: '99.6%',
+      insight: 'City Hotel sees the steepest deposit-policy gap in the portfolio: no-deposit bookings cancel at 45.6%, nearly double the non-refundable rate of 26.1%. Given OTA dominance at this property, mandating non-refundable terms for OTA channel bookings is the single highest-impact lever available.'
+    },
+    geo: {
+      countries: ['United Kingdom','Portugal','France','Germany','Spain','Italy','Ireland','Belgium'],
+      rev: [4.05,3.95,2.95,2.05,1.75,1.20,1.05,0.78],
+      topMarket: 'United Kingdom', topDetail: '€4.05M · 24.6% of City revenue', top2Share: '48.6%',
+      table: [
+        ['United Kingdom','€4.05M','sev-high','Higher','High'],
+        ['Portugal','€3.95M','sev-med','Moderate','Medium'],
+        ['France','€2.95M','sev-high','Higher','High'],
+        ['Germany','€2.05M','sev-high','Higher','High'],
+        ['Spain','€1.75M','sev-med','Moderate','Medium'],
+        ['Italy','€1.20M','sev-med','Moderate','High']
+      ],
+      insight: 'City Hotel draws a more international guest mix than Resort — UK overtakes Portugal as the top revenue source. International, OTA-sourced bookings dominate, and longer-haul guests show meaningfully higher cancellation rates than domestic Portuguese travellers.'
+    }
+  },
+
+  resort: {
+    label: 'Resort Hotel', baseline: '27.0%',
+
+    lead: {
+      vals: [7.5, 19.8, 27.4, 33.6, 44.1, 55.9],
+      windows: ['0 – 7 days','8 – 30 days','31 – 90 days','91 – 180 days','181 – 365 days','365 + days'],
+      revLost: ['~€0.3M','~€0.7M','~€1.1M','~€1.2M','~€0.9M','~€0.7M'],
+      max: '55.9%', min: '7.5%', riskRev: '€1.8M',
+      insight: 'Resort Hotel shows the same directional risk pattern as the portfolio but at materially lower magnitude — a 365+ day booking is <strong>7.5× more likely to cancel</strong> than a last-minute one, yet absolute rates stay 10–15 points below City Hotel throughout. Family and vacation bookings carry stronger trip commitment once planned.'
+    },
+    market: {
+      vals: [38, 24, 21, 17, 11, 6],
+      segs: ['Online Travel Agency','Offline TA / Tour Ops','Groups','Direct','Corporate','Aviation'],
+      shares: ['44.3%','25.1%','17.2%','9.1%','1.3%','0.1%'],
+      highSeg: 'Online TA', highRate: '~38% cancellation rate', lowSeg: 'Aviation', lowRate: '~6% cancellation rate', directRate: '~17%',
+      insight: 'Resort Hotel relies less heavily on OTA (44.3% vs City Hotel\'s 58.2%) and shows materially lower cancellation rates across every channel. Tour operator and group bookings — well represented at this property — carry stronger contractual commitment and meaningfully reduce overall exposure.'
+    },
+    cust: {
+      vals: [31, 19, 8, 4],
+      types: ['Transient','Transient-Party','Contract','Group'],
+      shares: ['67.8%','25.0%','4.6%','2.6%'],
+      highRate: '~31% cancellation rate', lowRate: '~4% cancellation rate', transientShare: '67.8%',
+      insight: 'Resort Hotel\'s customer mix is more balanced than City Hotel\'s, with a larger Transient-Party (family/group leisure) share at 25.0% — these guests cancel at roughly half the Transient rate. The leisure-destination booking pattern, often planned well in advance with deposits in place, supports stronger guest follow-through overall.'
+    },
+    deposit: {
+      vals: [31.2, 16.4, 98.9],
+      shares: ['85.1%','14.3%','0.6%'],
+      noDep: '31.2%', nonRef: '16.4%', ref: '98.9%',
+      insight: 'Resort Hotel already shows a healthier deposit mix — 14.3% of bookings are non-refundable (vs 9.8% at City Hotel) and the no-deposit cancel rate sits 14 points below City Hotel\'s. Extending the same non-refundable terms used here to City Hotel would likely close much of the portfolio-wide gap.'
+    },
+    geo: {
+      countries: ['Portugal','Germany','United Kingdom','Spain','France','Netherlands','Ireland','Belgium'],
+      rev: [8.75,2.10,1.95,1.85,1.40,0.95,0.80,0.62],
+      topMarket: 'Portugal', topDetail: '€8.75M · 60.3% of Resort revenue', top2Share: '74.8%',
+      table: [
+        ['Portugal','€8.75M','sev-low','Lower','Medium'],
+        ['Germany','€2.10M','sev-med','Moderate','Medium'],
+        ['United Kingdom','€1.95M','sev-med','Moderate','Medium'],
+        ['Spain','€1.85M','sev-low','Lower','Low'],
+        ['France','€1.40M','sev-med','Moderate','Medium'],
+        ['Netherlands','€0.95M','sev-low','Lower','Low']
+      ],
+      insight: 'Resort Hotel revenue is dominated by domestic Portuguese travellers (60.3% of revenue), who book with shorter lead times and lower cancellation risk. The leisure-destination profile of this property naturally insulates it from the longer-haul, OTA-heavy patterns seen at City Hotel.'
+    }
+  }
+};
+
+const monthly = [
+  {m:"Jul '15",rev:1111434,cancel:1251},{m:"Aug '15",rev:1518160,cancel:1558},
+  {m:"Sep '15",rev:1636506,cancel:2080},{m:"Oct '15",rev:1165234,cancel:1730},
+  {m:"Nov '15",rev:462989, cancel:486}, {m:"Dec '15",rev:650114, cancel:970},
+  {m:"Jan '16",rev:403011, cancel:557}, {m:"Feb '16",rev:786397, cancel:1337},
+  {m:"Mar '16",rev:1207839,cancel:1470},{m:"Apr '16",rev:1511185,cancel:2055},
+  {m:"May '16",rev:1633621,cancel:1901},{m:"Jun '16",rev:1870310,cancel:2084},
+  {m:"Jul '16",rev:2042171,cancel:1418},{m:"Aug '16",rev:2147989,cancel:1574},
+  {m:"Sep '16",rev:1978963,cancel:1984},{m:"Oct '16",rev:1805376,cancel:2487},
+  {m:"Nov '16",rev:1122903,cancel:1630},{m:"Dec '16",rev:1082038,cancel:1382},
+  {m:"Jan '17",rev:864787, cancel:1250},{m:"Feb '17",rev:1018658,cancel:1354},
+  {m:"Mar '17",rev:1391643,cancel:1663},{m:"Apr '17",rev:2090594,cancel:2409},
+  {m:"May '17",rev:2302138,cancel:2667},{m:"Jun '17",rev:2404584,cancel:2342},
+  {m:"Jul '17",rev:2409092,cancel:1731},{m:"Aug '17",rev:2165089,cancel:1385}
+];
+
+// Quarterly rollup
+const qDefs = [
+  {q:"Q3 2015",idx:[0,1,2]},  {q:"Q4 2015",idx:[3,4,5]},
+  {q:"Q1 2016",idx:[6,7,8]},  {q:"Q2 2016",idx:[9,10,11]},
+  {q:"Q3 2016",idx:[12,13,14]},{q:"Q4 2016",idx:[15,16,17]},
+  {q:"Q1 2017",idx:[18,19,20]},{q:"Q2 2017",idx:[21,22,23]},
+  {q:"Q3 2017",idx:[24,25]}
+];
+const quarterly = qDefs.map(function(d) {
+  return {
+    q: d.q,
+    rev:    d.idx.reduce(function(s,i){ return s + monthly[i].rev;    }, 0),
+    cancel: d.idx.reduce(function(s,i){ return s + monthly[i].cancel; }, 0)
+  };
+});
+
+// ── SCALE PRESETS ─────────────────────────────────────────────────────────
+var GX = { ticks:{color:'#94A3B8',font:{size:9}},  grid:{color:'rgba(208,213,224,0.6)'} };
+var GY = { ticks:{color:'#94A3B8',font:{size:10}}, grid:{color:'rgba(208,213,224,0.6)'} };
+
+// ── CHART REGISTRY ────────────────────────────────────────────────────────
+var chartReg = {};
+function mk(id, cfg) {
+  if (chartReg[id]) { try { chartReg[id].destroy(); } catch(e){} delete chartReg[id]; }
+  var el = document.getElementById(id);
+  if (!el) return;
+  chartReg[id] = new Chart(el, cfg);
+}
+
+// ── CHART BUILDERS ────────────────────────────────────────────────────────
+
+function buildLeadChart() {
+  var d = hotelData[currentHotel].lead.vals;
+  mk('leadChart', {
+    type:'bar',
+    data:{
+      labels:['0–7d','8–30d','31–90d','91–180d','181–365d','365d+'],
+      datasets:[{
+        data: d,
+        backgroundColor:['#1A7A5E','#D4770A','#C0622B','#C0392B','#9B1C1C','#6B0F0F'],
+        borderRadius:2
+      }]
+    },
+    options:{
+      responsive:true,
+      plugins:{legend:{display:false}},
+      scales:{
+        x: GX,
+        y: { ticks:{color:'#94A3B8',font:{size:10},callback:function(v){return v+'%'}}, grid:{color:'rgba(208,213,224,0.6)'}, min:0, max:80 }
+      }
+    }
+  });
+}
+
+function buildMktCancelChart() {
+  var d = hotelData[currentHotel].market.vals;
+  mk('mktCancelChart', {
+    type:'bar',
+    data:{
+      labels:['Online TA','Offline TA/TO','Groups','Direct','Corporate','Aviation'],
+      datasets:[{
+        label:'Cancel Rate (%)',
+        data: d,
+        backgroundColor:['#C0392B','#D4770A','#008080','#1A7A5E','#475569','#94A3B8'],
+        borderRadius:2
+      }]
+    },
+    options:{
+      indexAxis:'y',
+      responsive:true,
+      plugins:{legend:{display:false}},
+      scales:{
+        x:{ ticks:{color:'#94A3B8',font:{size:10},callback:function(v){return v+'%'}}, grid:{color:'rgba(208,213,224,0.6)'}, min:0, max:55 },
+        y:{ ticks:{color:'#1E293B',font:{size:12}}, grid:{display:false} }
+      }
+    }
+  });
+}
+
+function buildCustTypeChart() {
+  var d = hotelData[currentHotel].cust.vals;
+  mk('custTypeChart', {
+    type:'bar',
+    data:{
+      labels:['Transient','Transient-Party','Contract','Group'],
+      datasets:[{
+        label:'Cancel Rate (%)',
+        data: d,
+        backgroundColor:['#C0392B','#D4770A','#1A7A5E','#008080'],
+        borderRadius:2
+      }]
+    },
+    options:{
+      responsive:true,
+      plugins:{legend:{display:false}},
+      scales:{
+        x: GX,
+        y:{ ticks:{color:'#94A3B8',font:{size:10},callback:function(v){return v+'%'}}, grid:{color:'rgba(208,213,224,0.6)'}, min:0, max:55 }
+      }
+    }
+  });
+}
+
+function buildDepositChart() {
+  var d = hotelData[currentHotel].deposit.vals;
+  mk('depositChart', {
+    type:'bar',
+    data:{
+      labels:['No Deposit','Non-Refundable','Refundable'],
+      datasets:[{
+        label:'Cancel Rate (%)',
+        data: d,
+        backgroundColor:['#D4770A','#1A7A5E','#6B0F0F'],
+        borderRadius:2,
+        barThickness:60
+      }]
+    },
+    options:{
+      responsive:true,
+      plugins:{legend:{display:false}},
+      scales:{
+        x: GX,
+        y:{ ticks:{color:'#94A3B8',font:{size:10},callback:function(v){return v+'%'}}, grid:{color:'rgba(208,213,224,0.6)'}, min:0, max:110 }
+      }
+    }
+  });
+}
+
+function buildCountryChart() {
+  var g = hotelData[currentHotel].geo;
+  mk('countryChart', {
+    type:'bar',
+    indexAxis:'y',
+    data:{
+      labels: g.countries,
+      datasets:[{
+        label:'Revenue (€M)',
+        data: g.rev,
+        backgroundColor:[
+          'rgba(0,128,128,0.90)','rgba(0,128,128,0.76)','rgba(0,128,128,0.62)','rgba(0,128,128,0.50)',
+          'rgba(0,61,61,0.70)','rgba(0,61,61,0.58)','rgba(26,122,94,0.60)','rgba(26,122,94,0.45)'
+        ],
+        borderRadius:2
+      }]
+    },
+    options:{
+      responsive:true,
+      plugins:{legend:{display:false}},
+      scales:{
+        x:{ ticks:{color:'#94A3B8',font:{size:10},callback:function(v){return '€'+v+'M'}}, grid:{color:'rgba(208,213,224,0.6)'} },
+        y:{ ticks:{color:'#1E293B',font:{size:12}}, grid:{display:false} }
+      }
+    }
+  });
+}
+
+function buildMonthlyTrend(id) {
+  var mLabels = monthly.map(function(d){return d.m;});
+  mk(id, {
+    type:'bar',
+    data:{
+      labels: mLabels,
+      datasets:[
+        { label:'Cancellations', data:monthly.map(function(d){return d.cancel;}), backgroundColor:'rgba(192,57,43,0.72)', borderRadius:2, yAxisID:'y', order:2 },
+        { label:'Total Revenue (€)', data:monthly.map(function(d){return d.rev;}), type:'line', borderColor:'#008080', backgroundColor:'rgba(0,128,128,0.06)', pointBackgroundColor:'#008080', pointRadius:3, tension:0.4, fill:true, yAxisID:'y2', order:1 }
+      ]
+    },
+    options:{
+      responsive:true,
+      plugins:{legend:{labels:{color:'#64748B',font:{size:11}}}},
+      scales:{
+        x: GX,
+        y:{ position:'left',  ticks:{color:'#C0392B',font:{size:10}}, grid:{color:'rgba(208,213,224,0.6)'} },
+        y2:{ position:'right', ticks:{color:'#008080',font:{size:10},callback:function(v){return '€'+Math.round(v/1000)+'k'}}, grid:{display:false} }
+      }
+    }
+  });
+}
+
+function buildQuarterlyTrend(id) {
+  var qBg = quarterly.map(function(d,i){
+    if(i===1||i===5) return 'rgba(212,119,10,0.80)';
+    if(i===0||i===3||i===7) return 'rgba(192,57,43,0.90)';
+    return 'rgba(192,57,43,0.65)';
+  });
+  mk(id, {
+    type:'bar',
+    data:{
+      labels: quarterly.map(function(d){return d.q;}),
+      datasets:[
+        { label:'Cancellations', data:quarterly.map(function(d){return d.cancel;}), backgroundColor:qBg, borderRadius:2, yAxisID:'y', order:2 },
+        { label:'Total Revenue (€)', data:quarterly.map(function(d){return d.rev;}), type:'line', borderColor:'#008080', backgroundColor:'rgba(0,128,128,0.07)', pointBackgroundColor:'#008080', pointRadius:5, tension:0.35, fill:true, yAxisID:'y2', order:1 }
+      ]
+    },
+    options:{
+      responsive:true,
+      maintainAspectRatio:false,
+      interaction:{ mode:'index', intersect:false },
+      plugins:{legend:{labels:{color:'#64748B',font:{size:12}}}},
+      scales:{
+        x:{ ticks:{color:'#94A3B8',font:{size:11}}, grid:{color:'rgba(208,213,224,0.6)'} },
+        y:{
+          position:'left',
+          beginAtZero:true,
+          ticks:{color:'#C0392B',font:{size:11},callback:function(v){return v.toLocaleString();}},
+          grid:{color:'rgba(208,213,224,0.6)'},
+          title:{display:true,text:'Cancellations',color:'#C0392B',font:{size:11}}
+        },
+        y2:{
+          position:'right',
+          beginAtZero:true,
+          ticks:{color:'#008080',font:{size:11},callback:function(v){return '€'+Math.round(v/1000000)+'M';}},
+          grid:{display:false},
+          title:{display:true,text:'Revenue (€)',color:'#008080',font:{size:11}}
+        }
+      }
+    }
+  });
+}
+
+// ── RENDER ALL STATIC TEXT / TABLES FOR CURRENT HOTEL ─────────────────────
+function setText(id, html) {
+  var el = document.getElementById(id);
+  if (el) el.innerHTML = html;
+}
+
+function renderHotelContent() {
+  var d = hotelData[currentHotel];
+
+  // ── LEAD TIME PANEL ──
+  setText('lead-max', d.lead.max);
+  setText('lead-min', d.lead.min);
+  setText('lead-risk-rev', d.lead.riskRev);
+  setText('lead-insight', '<strong>Key finding:</strong> ' + d.lead.insight);
+  for (var i = 0; i < 6; i++) {
+    setText('lead-pct-' + i, d.lead.vals[i].toFixed(1) + '%');
+    var fillEl = document.getElementById('lead-fill-' + i);
+    if (fillEl) fillEl.dataset.target = ((d.lead.vals[i] / 80) * 100).toFixed(1);
+  }
+  var leadRows = '';
+  for (var i = 0; i < d.lead.windows.length; i++) {
+    var sc = sevClass(d.lead.vals[i]);
+    var sl = sevLabel(d.lead.vals[i]);
+    leadRows += '<tr><td>' + d.lead.windows[i] + '</td><td>' + d.lead.vals[i].toFixed(1) + '%</td><td>' + d.lead.revLost[i] + '</td><td><span class="sev ' + sc + '">' + sl + '</span></td></tr>';
+  }
+  setText('lead-table-body', leadRows);
+
+  // ── MARKET SEGMENT PANEL ──
+  setText('mkt-high-seg', d.market.highSeg);
+  setText('mkt-high-rate', d.market.highRate);
+  setText('mkt-low-seg', d.market.lowSeg);
+  setText('mkt-low-rate', d.market.lowRate);
+  setText('mkt-direct-rate', d.market.directRate);
+  setText('mkt-insight', '<strong>Key finding:</strong> ' + d.market.insight);
+  var mktRows = '';
+  for (var i = 0; i < d.market.segs.length; i++) {
+    var sc = sevClass(d.market.vals[i]);
+    var sl = sevLabel(d.market.vals[i]);
+    mktRows += '<tr><td>' + d.market.segs[i] + '</td><td>' + d.market.shares[i] + '</td><td>~' + d.market.vals[i] + '%</td><td><span class="sev ' + sc + '">' + sl + '</span></td></tr>';
+  }
+  setText('mkt-table-body', mktRows);
+
+  // ── CUSTOMER TYPE PANEL ──
+  setText('cust-high-rate', d.cust.highRate);
+  setText('cust-low-rate', d.cust.lowRate);
+  setText('cust-transient-share', d.cust.transientShare);
+  setText('cust-insight', '<strong>Key finding:</strong> ' + d.cust.insight);
+  var custRows = '';
+  for (var i = 0; i < d.cust.types.length; i++) {
+    var sc = sevClass(d.cust.vals[i]);
+    var sl = sevLabel(d.cust.vals[i]);
+    custRows += '<tr><td>' + d.cust.types[i] + '</td><td>' + d.cust.shares[i] + '</td><td>~' + d.cust.vals[i] + '%</td><td><span class="sev ' + sc + '">' + sl + '</span></td></tr>';
+  }
+  setText('cust-table-body', custRows);
+
+  // ── BOOKING TYPE (DEPOSIT) PANEL ──
+  setText('dep-nodep-rate', d.deposit.noDep);
+  setText('dep-nonref-rate', d.deposit.nonRef);
+  setText('dep-ref-rate', d.deposit.ref);
+  setText('dep-insight', '<strong>Key finding:</strong> ' + d.deposit.insight);
+  var depLabels = ['No Deposit','Non-Refundable','Refundable'];
+  var depRows = '';
+  for (var i = 0; i < 3; i++) {
+    var sc = sevClass(d.deposit.vals[i]);
+    var sl = sevLabel(d.deposit.vals[i]);
+    depRows += '<tr><td>' + depLabels[i] + '</td><td>' + d.deposit.shares[i] + '</td><td>' + d.deposit.vals[i].toFixed(1) + '%</td><td><span class="sev ' + sc + '">' + sl + '</span></td></tr>';
+  }
+  setText('dep-table-body', depRows);
+
+  // ── CUSTOMER GEOGRAPHIC PANEL ──
+  setText('geo-top-market', d.geo.topMarket);
+  setText('geo-top-detail', d.geo.topDetail);
+  setText('geo-top2-share', d.geo.top2Share);
+  setText('geo-insight', '<strong>Key finding:</strong> ' + d.geo.insight);
+  var geoRows = '';
+  for (var i = 0; i < d.geo.table.length; i++) {
+    var row = d.geo.table[i];
+    geoRows += '<tr><td>' + row[0] + '</td><td>' + row[1] + '</td><td><span class="sev ' + row[2] + '">' + row[3] + '</span></td><td>' + row[4] + '</td></tr>';
+  }
+  setText('geo-table-body', geoRows);
+}
+
+// ── BUILD ALL VISIBLE CHARTS ──────────────────────────────────────────────
+function buildAllCharts() {
+  // Always-visible (section 02)
+  buildQuarterlyTrend('trendChart');
+
+  // Panel-specific charts — only build if canvas exists in DOM (panel visible)
+  buildLeadChart();
+  buildMktCancelChart();
+  buildCustTypeChart();
+  buildDepositChart();
+  buildCountryChart();
+
+  // Refresh all static text and tables to match current hotel selection
+  renderHotelContent();
+}
+
+// ── ANIMATE FILL BARS ─────────────────────────────────────────────────────
+function animateFills() {
+  document.querySelectorAll('.risk-fill').forEach(function(el) {
+    setTimeout(function(){ el.style.width = (el.dataset.target || '0') + '%'; }, 400);
+  });
+  document.querySelectorAll('.ch-fill').forEach(function(el) {
+    setTimeout(function(){ el.style.width = (el.dataset.target || '0') + '%'; }, 500);
+  });
+}
+
+// ── TAB SWITCHING ─────────────────────────────────────────────────────────
+var colorMap = {
+  red:   'tab-active-red',
+  amber: 'tab-active-amber',
+  navy:  'tab-active-navy',
+  green: 'tab-active-green',
+  ink:   'tab-active-ink'
+};
+var allColors = ['tab-active-red','tab-active-amber','tab-active-navy','tab-active-green','tab-active-ink'];
+
+document.querySelectorAll('.driver-tab').forEach(function(tab) {
+  tab.addEventListener('click', function() {
+    var panelId = tab.getAttribute('data-panel');
+    var color   = tab.getAttribute('data-color');
+
+    // Deactivate all tabs
+    document.querySelectorAll('.driver-tab').forEach(function(t) {
+      allColors.forEach(function(c){ t.classList.remove(c); });
+    });
+    tab.classList.add(colorMap[color] || 'tab-active-ink');
+
+    // Hide all panels, show selected
+    document.querySelectorAll('.driver-panel').forEach(function(p) {
+      p.classList.remove('visible');
+    });
+    var target = document.getElementById('panel-' + panelId);
+    if (target) target.classList.add('visible');
+
+    // Rebuild charts after panel is visible in DOM
+    setTimeout(function(){ buildAllCharts(); animateFills(); }, 80);
+  });
+});
+
+// ── HOTEL TOGGLE (MAIN FILTER) ──────────────────────────────────────────
+document.querySelectorAll('.hotel-btn').forEach(function(btn) {
+  btn.addEventListener('click', function() {
+    var hotel = btn.getAttribute('data-hotel');
+    currentHotel = hotel;
+
+    // Toggle active state
+    document.querySelectorAll('.hotel-btn').forEach(function(b){ b.classList.remove('hotel-active'); });
+    btn.classList.add('hotel-active');
+
+    // Update context note
+    var note = document.getElementById('hotelContextNote');
+    if (hotel === 'all') {
+      note.style.display = 'none';
+    } else {
+      var label = hotelData[hotel].label;
+      var baseline = hotelData[hotel].baseline;
+      note.style.display = 'block';
+      note.textContent = '📍 Viewing driver breakdown for ' + label + ' only — baseline cancellation rate ' + baseline + '.';
+    }
+
+    // Rebuild charts with new hotel context
+    setTimeout(function(){ buildAllCharts(); animateFills(); }, 60);
+  });
+});
+
+// ── INIT ──────────────────────────────────────────────────────────────────
+window.addEventListener('load', function() {
+  buildAllCharts();
+  animateFills();
+});
+</script>
+</body>
+</html>
